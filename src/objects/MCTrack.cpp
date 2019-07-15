@@ -91,10 +91,10 @@ void MCTrack::print(std::ostream& out) const {
     static const size_t small_gap = 6;
     static const size_t largest_output = 2 * big_gap + 2 * med_gap + 2 * small_gap;
 
-    auto parent = getParent();
+    // auto parent = getParent();
 
     auto title = std::stringstream();
-    title << "--- Printing MCTrack information for track (" << this << ") ";
+    title << "--- Printing MCTrack information for track";
 
     out << '\n'
         << std::setw(largest_output) << std::left << std::setfill('-') << title.str() << '\n'
@@ -115,11 +115,11 @@ void MCTrack::print(std::ostream& out) const {
         << std::left << std::setw(big_gap) << "Initial total energy: " << std::right << std::setw(med_gap) << initial_tot_E_
         << std::setw(small_gap) << " MeV | " << std::left << std::setw(big_gap) << "Final total energy: " << std::right
         << std::setw(med_gap) << final_tot_E_ << std::setw(small_gap) << " MeV   \n";
-    if(parent != nullptr) {
-        out << "Linked parent: " << parent_.GetObject() << '\n';
-    } else {
-        out << "Linked parent: <nullptr>\n";
-    }
+    // if(parent != nullptr) {
+    //     out << "Linked parent: " << parent_.GetObject() << '\n';
+    // } else {
+    //     out << "Linked parent: <nullptr>\n";
+    // }
     out << std::setfill('-') << std::setw(largest_output) << "" << std::setfill(' ') << std::endl;
 }
 

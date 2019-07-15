@@ -75,11 +75,11 @@ void MCParticle::print(std::ostream& out) const {
     static const size_t small_gap = 6;
     static const size_t largest_output = big_gap + 3 * med_gap + 3 * small_gap;
 
-    auto track = getTrack();
-    auto parent = getParent();
+    // auto track = getTrack();
+    // auto parent = getParent();
 
     auto title = std::stringstream();
-    title << "--- Printing MCParticle information (" << this << ") ";
+    title << "--- Printing MCParticle information";
     out << '\n'
         << std::setw(largest_output) << std::left << std::setfill('-') << title.str() << '\n'
         << std::setfill(' ') << std::left << std::setw(big_gap) << "Particle type (PDG ID): " << std::right
@@ -100,16 +100,16 @@ void MCParticle::print(std::ostream& out) const {
         << std::setw(small_gap) << " mm |" << std::setw(med_gap) << global_end_point_.Z() << std::setw(small_gap)
         << " mm  \n"
         << std::left << std::setw(big_gap) << "Linked parent:";
-    if(parent != nullptr) {
-        out << std::right << std::setw(small_gap) << parent << '\n';
-    } else {
-        out << std::right << std::setw(small_gap) << "<nullptr>\n";
-    }
-    out << std::left << std::setw(big_gap) << "Linked track:";
-    if(track != nullptr) {
-        out << std::right << std::setw(small_gap) << track << '\n';
-    } else {
-        out << std::right << std::setw(small_gap) << "<nullptr>\n";
-    }
+    // if(parent != nullptr) {
+    //     out << std::right << std::setw(small_gap) << parent << '\n';
+    // } else {
+    //     out << std::right << std::setw(small_gap) << "<nullptr>\n";
+    // }
+    // out << std::left << std::setw(big_gap) << "Linked track:";
+    // if(track != nullptr) {
+    //     out << std::right << std::setw(small_gap) << track << '\n';
+    // } else {
+    //     out << std::right << std::setw(small_gap) << "<nullptr>\n";
+    // }
     out << std::setfill('-') << std::setw(largest_output) << "" << std::setfill(' ') << std::endl;
 }
