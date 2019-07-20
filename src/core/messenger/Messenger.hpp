@@ -11,7 +11,7 @@
 #define ALLPIX_MESSENGER_H
 
 #include <list>
-#include <map>
+#include <unordered_map>
 #include <memory>
 #include <typeindex>
 #include <utility>
@@ -24,7 +24,7 @@ namespace allpix {
 
     /**
      * @ingroup Managers
-     * @brief Manager responsible for setting up communicatio between objects and sending messages between them
+     * @brief Manager responsible for setting up communication between objects and sending messages between them
      *
      * Registers and sets up communication (delegates) from modules to other listening modules. Dispatches messages from
      * modules to other listening modules. There are various way to receive the messages using \ref Delegates. Messages are
@@ -132,10 +132,15 @@ namespace allpix {
         bool hasReceiver(Module* source, const std::shared_ptr<BaseMessage>& message);
 
         /**
-         * @brief Check if a module is satisfied for running (all required messages received)
+         * @brief Check if a delegate has recieved its message
          * @return True if satisfied, false otherwise
          */
-        bool isSatisfied(Module* module) const;
+        bool isSatisfied(BaseDelegate* delegate) const;
+
+        /**
+         * @brief Resets the messenger and clear any stored messages.
+         */
+        void reset();
 
     private:
         /**
@@ -153,29 +158,68 @@ namespace allpix {
          */
         void remove_delegate(BaseDelegate* delegate);
 
-        void dispatch_message(Module* source, std::shared_ptr<BaseMessage> message, std::string name);
-        bool dispatch_message(Module* source,
-                              const std::shared_ptr<BaseMessage>& message,
-                              const std::string& name,
-                              const std::string& id);
-
         using DelegateMap = std::map<std::type_index, std::map<std::string, std::list<std::shared_ptr<BaseDelegate>>>>;
         using DelegateIteratorMap =
             std::map<BaseDelegate*,
                      std::tuple<std::type_index, std::string, std::list<std::shared_ptr<BaseDelegate>>::iterator>>;
 
-        static DelegateMap delegates_;
-        static DelegateIteratorMap delegate_to_iterator_;
+        DelegateMap delegates_;
+        DelegateIteratorMap delegate_to_iterator_;
 
-        std::map<std::string, DelegateTypes> messages_;
-        std::map<std::string, bool> satisfied_modules_;
-        std::vector<std::shared_ptr<BaseMessage>> sent_messages_;
+        /**
+         * @breif Responsible for the actual handling of messages between Modules.
+         *
+         * The local messenger is an internal object that is allocated for each thread seperatly. It handles dispatching
+         * and fetching messages between Modules.
+         */
+        class LocalMessenger {
+            public:
+                LocalMessenger(Messenger& global_messenger);
+
+                /**
+                * @brief Resets the messenger and clear any stored messages.
+                */
+                void reset();
+
+                void dispatch_message(Module* source, std::shared_ptr<BaseMessage> message, std::string name);
+                bool dispatch_message(Module* source,
+                                    const std::shared_ptr<BaseMessage>& message,
+                                    const std::string& name,
+                                    const std::string& id);
+
+                /**
+                * @brief Check if a delegate has recieved its message
+                * @return True if satisfied, false otherwise
+                */
+                bool isSatisfied(BaseDelegate* delegate) const;
+
+                /**
+                * @brief Fetches a single message of specified type meant for the calling module
+                * @return Shared pointer to message
+                */
+                template <typename T> std::shared_ptr<T> fetchMessage(Module* module);
+
+                /**
+                * @brief Fetches multiple messages of specified type meant for the calling module
+                * @return Vector of shared pointers to messages
+                */
+                template <typename T> std::vector<std::shared_ptr<T>> fetchMultiMessage(Module* module);
+
+                /**
+                * @brief Fetches filtered messages meant for the calling module
+                * @return Vector of pairs containing shared pointer to and name of message
+                */
+                std::vector<std::pair<std::shared_ptr<BaseMessage>, std::string>> fetchFilteredMessages(Module* module);
+            private:
+                Messenger& global_messenger_;
+
+                std::unordered_map<std::string, std::unordered_map<std::type_index, DelegateTypes>> messages_;
+                std::vector<std::shared_ptr<BaseMessage>> sent_messages_;
+        };
+
+        static thread_local std::unique_ptr<LocalMessenger> local_messenger_;
 
         mutable std::mutex mutex_;
-
-#ifndef NDEBUG
-        static unsigned int instance_count_;
-#endif
     };
 } // namespace allpix
 

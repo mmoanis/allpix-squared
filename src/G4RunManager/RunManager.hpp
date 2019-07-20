@@ -27,19 +27,20 @@ namespace allpix {
      */
     class RunManager : public G4RunManager {
     public:
-        RunManager();
+        RunManager() = default;
         virtual ~RunManager() = default;
 
         /**
-         * @brief Initialize the event loop for a given number of events. Seed the RNG with unique seed.
+         * @brief Wrapper around G4RunManager BeamOn that seeds the RNG before actually calling
+         * BeamOn
          */
-        virtual void InitializeEventLoop(G4int n_event, const char *macro_file, G4int n_select) override;
+        virtual void BeamOn(G4int n_event, const char *macro_file, G4int n_select) override;
 
     private:
         static constexpr G4int number_seeds_per_event_{2};
         CLHEP::HepRandomEngine* master_random_engine_{nullptr};
         CLHEP::HepRandomEngine* event_random_engine_{nullptr};
-        std::array<double, 1024 * number_seeds_per_event_> seed_array_;
+        std::array<double, number_seeds_per_event_> seed_array_;
     };
 } // namespace allpix
 

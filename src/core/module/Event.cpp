@@ -32,12 +32,13 @@ std::set<unsigned int> Event::unique_ids_;
 
 Event::Event(ModuleList modules,
              const unsigned int event_num,
+             Messenger& global_messenger,
              std::atomic<bool>& terminate,
              std::condition_variable& master_condition,
              std::map<Module*, long double>& module_execution_time,
              std::mt19937_64& seeder)
     : number(event_num), modules_(std::move(modules)), terminate_(terminate), master_condition_(master_condition),
-      module_execution_time_(module_execution_time) {
+      module_execution_time_(module_execution_time), messenger_(global_messenger) {
     random_engine_.seed(seeder());
 #ifndef NDEBUG
     // Ensure that the ID is unique
@@ -99,7 +100,7 @@ void Event::run(std::shared_ptr<Module>& module) {
                                       << "]";
 
     // Check if the module is satisfied to run
-    if(!messenger_.isSatisfied(module.get())) {
+    if(!module->check_delegates(&messenger_)) {
         LOG(TRACE) << "Not all required messages are received for " << module->get_identifier().getUniqueName()
                    << ", skipping module!";
         return;
@@ -143,6 +144,8 @@ void Event::run(std::shared_ptr<Module>& module) {
 }
 
 void Event::run() {
+    messenger_.reset();
+
     for(auto& module : modules_) {
         run(module);
     }

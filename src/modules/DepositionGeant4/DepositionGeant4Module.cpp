@@ -263,18 +263,28 @@ void DepositionGeant4Module::init(std::mt19937_64& seeder) {
 }
 
 void DepositionGeant4Module::run(Event* event) {
+    MTRunManager* run_manager_mt = nullptr;
+
     // Suppress output stream if not in debugging mode
     IFLOG(DEBUG);
     else {
         SUPPRESS_STREAM(G4cout);
     }
 
-    // In MT-mode the sensitive detectors will be created with the calls to BeamOn. So we construct the
-    // track manager for each calling thread here.
-    if (track_info_manager_ == nullptr) {
-        track_info_manager_ = std::make_unique<TrackInfoManager>();
+    // Initialize the thread local G4RunManager in case of MT
+    if (using_multithreading_) {
+        run_manager_mt = static_cast<MTRunManager*>(run_manager_g4_);
+
+        // In MT-mode the sensitive detectors will be created with the calls to BeamOn. So we construct the
+        // track manager for each calling thread here.
+        if (track_info_manager_ == nullptr) {
+            track_info_manager_ = std::make_unique<TrackInfoManager>();
+        }
+
+        run_manager_mt->InitializeForThread();
     }
 
+    // Seed the sensitive detectors RNG
     for(auto& sensor : sensors_) {
         sensor->seed(event->getRandomNumber());
     }
@@ -282,7 +292,6 @@ void DepositionGeant4Module::run(Event* event) {
     // Start a single event from the beam
     LOG(TRACE) << "Enabling beam";
     if (using_multithreading_) {
-        MTRunManager* run_manager_mt = static_cast<MTRunManager*>(run_manager_g4_);
         run_manager_mt->Run(static_cast<G4int>(event->number), static_cast<int>(config_.get<unsigned int>("number_of_particles", 1)));
     } else {
         run_manager_g4_->BeamOn(static_cast<int>(config_.get<unsigned int>("number_of_particles", 1)));
@@ -322,6 +331,11 @@ void DepositionGeant4Module::finalize() {
         }
     }
 
+    // Record the number of sensors and the total charges
+    if (!using_multithreading_) {
+        record_module_statistics();
+    }
+
     // Print summary or warns if module did not output any charges
     if(number_of_sensors_ > 0 && total_charges_ > 0 && last_event_num_ > 0) {
         size_t average_charge = total_charges_ / number_of_sensors_ / last_event_num_;
@@ -333,17 +347,11 @@ void DepositionGeant4Module::finalize() {
 }
 
 void DepositionGeant4Module::finalizeThread() {
-    if (using_multithreading_) {
-        MTRunManager* run_manager_mt = static_cast<MTRunManager*>(run_manager_g4_);
-        run_manager_mt->TerminateForThread();
-    }
+    MTRunManager* run_manager_mt = static_cast<MTRunManager*>(run_manager_g4_);
+    run_manager_mt->TerminateForThread();
 
-    number_of_sensors_ = sensors_.size();
-
-    // We calculate the total deposited charges here, since sensors exist per thread
-    for(auto& sensor : sensors_) {
-        total_charges_ += sensor->getTotalDepositedCharge();
-    }
+    // Record the number of sensors and the total charges
+    record_module_statistics();
 }
 
 void DepositionGeant4Module::construct_sensitive_detectors_and_fields(double fano_factor, double charge_creation_energy) {
@@ -412,5 +420,14 @@ void DepositionGeant4Module::construct_sensitive_detectors_and_fields(double fan
 
     if(!useful_deposition) {
         LOG(ERROR) << "Not a single listener for deposited charges, module is useless!";
+    }
+}
+
+void DepositionGeant4Module::record_module_statistics() {
+    number_of_sensors_ = sensors_.size();
+
+    // We calculate the total deposited charges here, since sensors exist per thread
+    for(auto& sensor : sensors_) {
+        total_charges_ += sensor->getTotalDepositedCharge();
     }
 }

@@ -23,21 +23,14 @@
 
 using namespace allpix;
 
-Messenger::DelegateMap Messenger::delegates_;
-Messenger::DelegateIteratorMap Messenger::delegate_to_iterator_;
+thread_local std::unique_ptr<Messenger::LocalMessenger> Messenger::local_messenger_;
 
-#ifdef NDEBUG
 Messenger::Messenger() = default;
+#ifdef NDEBUG
 Messenger::~Messenger() = default;
 #else
-unsigned int Messenger::instance_count_;
-Messenger::Messenger() {
-    instance_count_++;
-}
 Messenger::~Messenger() {
-    if(--instance_count_ == 0) {
-        assert(delegate_to_iterator_.empty());
-    }
+    assert(delegate_to_iterator_.empty());
 }
 #endif
 
@@ -90,13 +83,8 @@ bool Messenger::hasReceiver(Module* source, const std::shared_ptr<BaseMessage>& 
     return false;
 }
 
-bool Messenger::isSatisfied(Module* module) const {
-    // Check delegate flags. If false, check event-local satisfaction.
-    try {
-        return module->check_delegates() || satisfied_modules_.at(module->getUniqueName());
-    } catch(const std::out_of_range&) {
-        return false;
-    }
+bool Messenger::isSatisfied(BaseDelegate* delegate) const {
+    return local_messenger_->isSatisfied(delegate);
 }
 
 void Messenger::add_delegate(const std::type_info& message_type,
@@ -136,7 +124,22 @@ void Messenger::remove_delegate(BaseDelegate* delegate) {
     delegate_to_iterator_.erase(iter);
 }
 
-void Messenger::dispatch_message(Module* source, std::shared_ptr<BaseMessage> message, std::string name) {
+std::vector<std::pair<std::shared_ptr<BaseMessage>, std::string>> Messenger::fetchFilteredMessages(Module* module) {
+    return local_messenger_->fetchFilteredMessages(module);
+}
+
+void Messenger::reset() {
+    if (local_messenger_ == nullptr) {
+        local_messenger_ = std::make_unique<LocalMessenger> (*this);
+    }
+
+    local_messenger_->reset();
+}
+
+Messenger::LocalMessenger::LocalMessenger(Messenger& global_messenger) : global_messenger_(global_messenger) {
+}
+
+void Messenger::LocalMessenger::dispatch_message(Module* source, std::shared_ptr<BaseMessage> message, std::string name) {
     // Get the name of the output message
     if(name == "-") {
         name = source->get_configuration().get<std::string>("output");
@@ -161,7 +164,7 @@ void Messenger::dispatch_message(Module* source, std::shared_ptr<BaseMessage> me
     sent_messages_.emplace_back(message);
 }
 
-bool Messenger::dispatch_message(Module* source,
+bool Messenger::LocalMessenger::dispatch_message(Module* source,
                                  const std::shared_ptr<BaseMessage>& message,
                                  const std::string& name,
                                  const std::string& id) {
@@ -172,28 +175,26 @@ bool Messenger::dispatch_message(Module* source,
     std::type_index type_idx = typeid(*inst);
 
     // Send messages only to their specific listeners
-    for(auto& delegate : delegates_[type_idx][id]) {
+    for(auto& delegate : global_messenger_.delegates_[type_idx][id]) {
         if(check_send(message.get(), delegate.get())) {
             LOG(TRACE) << "Sending message " << allpix::demangle(type_idx.name()) << " from " << source->getUniqueName()
                        << " to " << delegate->getUniqueName();
             // Construct BaseMessage where message should be stored
-            auto& dest = messages_[delegate->getUniqueName()];
+            auto& dest = messages_[delegate->getUniqueName()][type_idx];
 
             delegate->process(message, name, dest);
-            satisfied_modules_[delegate->getUniqueName()] = true;
             send = true;
         }
     }
 
     // Dispatch to base message listeners
     assert(typeid(BaseMessage) != typeid(*inst));
-    for(auto& delegate : delegates_[typeid(BaseMessage)][id]) {
+    for(auto& delegate : global_messenger_.delegates_[typeid(BaseMessage)][id]) {
         if(check_send(message.get(), delegate.get())) {
             LOG(TRACE) << "Sending message " << allpix::demangle(type_idx.name()) << " from " << source->getUniqueName()
                        << " to generic listener " << delegate->getUniqueName();
-            auto& dest = messages_[delegate->getUniqueName()];
+            auto& dest = messages_[delegate->getUniqueName()][typeid(BaseMessage)];
             delegate->process(message, name, dest);
-            satisfied_modules_[delegate->getUniqueName()] = true;
             send = true;
         }
     }
@@ -201,6 +202,35 @@ bool Messenger::dispatch_message(Module* source,
     return send;
 }
 
-std::vector<std::pair<std::shared_ptr<BaseMessage>, std::string>> Messenger::fetchFilteredMessages(Module* module) {
-    return messages_[module->getUniqueName()].filter_multi;
+std::vector<std::pair<std::shared_ptr<BaseMessage>, std::string>> Messenger::LocalMessenger::fetchFilteredMessages(Module* module) {
+    const std::type_index type_idx = typeid(BaseMessage);
+    return messages_.at(module->getUniqueName()).at(type_idx).filter_multi;
+}
+
+bool Messenger::LocalMessenger::isSatisfied(BaseDelegate* delegate) const {
+    // check our records for messages for this module
+    const std::string name = delegate->getUniqueName();
+    auto messages_iter = messages_.find(name);
+    if (messages_iter == messages_.end()) {
+        return false;
+    }
+
+    // check if this delegate is in our records
+    auto delegate_iter = global_messenger_.delegate_to_iterator_.find(delegate);
+    if(delegate_iter == global_messenger_.delegate_to_iterator_.end()) {
+        throw std::out_of_range("delegate not found in listeners");
+    }
+
+    // check our records for messages for this delegate
+    auto iter = messages_iter->second.find(std::get<0>(delegate_iter->second));
+    if (iter == messages_iter->second.end()) {
+        return false;
+    }
+
+    return true;
+}
+
+void Messenger::LocalMessenger::reset() {
+    messages_.clear();
+    sent_messages_.clear();
 }

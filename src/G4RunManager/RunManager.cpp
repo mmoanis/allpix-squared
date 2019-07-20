@@ -11,14 +11,15 @@
 
 using namespace allpix;
 
-RunManager::RunManager() {
-    master_random_engine_ = G4Random::getTheEngine();
-}
-
-void RunManager::InitializeEventLoop(G4int n_event, const char *macro_file, G4int n_select) {
+void RunManager::BeamOn(G4int n_event, const char *macro_file, G4int n_select) {
     if (!fakeRun) {
-        // create a new engine with the same type as the default engine
+        // Create a new engine with the same type as the default engine
         if (event_random_engine_ == nullptr) {
+            // Remember the default RNG engine before replacing it so we can use it
+            // later.
+            // TODO: maybe we should delete it ourselves too
+            master_random_engine_ = G4Random::getTheEngine();
+
             if (dynamic_cast<const CLHEP::HepJamesRandom*>(master_random_engine_)) {
                 event_random_engine_ = new CLHEP::HepJamesRandom;
             }
@@ -44,8 +45,9 @@ void RunManager::InitializeEventLoop(G4int n_event, const char *macro_file, G4in
                 event_random_engine_ = new CLHEP::RanshiEngine;
             }
 
+            // Replace the RNG engine with the new one
+            // TODO: maybe need to do something if it was null?!
             if (event_random_engine_ != nullptr) {
-                // Replace the RNG engine with the new one
                 G4Random::setTheEngine(event_random_engine_);
             }
         }
@@ -54,8 +56,10 @@ void RunManager::InitializeEventLoop(G4int n_event, const char *macro_file, G4in
         // and use them as seeds to the second one. This is exactly what the MTRunManager
         // does where the second engine is a thread local version
         G4RNGHelper* helper = G4RNGHelper::GetInstance();
-        master_random_engine_->flatArray(number_seeds_per_event_ * n_event, &seed_array_[0]);
-        helper->Fill(&seed_array_[0], n_event, n_event, 2);
+
+        // Fill 1 set of seeds only
+        master_random_engine_->flatArray(number_seeds_per_event_, &seed_array_[0]);
+        helper->Fill(&seed_array_[0], 1, 1, number_seeds_per_event_);
 
         long s1 = helper->GetSeed(0);
         long s2 = helper->GetSeed(1);
@@ -63,6 +67,6 @@ void RunManager::InitializeEventLoop(G4int n_event, const char *macro_file, G4in
         G4Random::setTheSeeds(seeds, -1);
     }
 
-    G4RunManager::InitializeEventLoop(n_event, macro_file, n_select);
-
+    // Redirect the call to BeamOn
+    G4RunManager::BeamOn(n_event, macro_file, n_select);
 }
