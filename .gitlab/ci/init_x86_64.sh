@@ -15,8 +15,6 @@ else
     exit 1
 fi
 
-sudo yum install -y valgrind
-
 # Determine is you have CVMFS installed
 if [ ! -d "/cvmfs" ]; then
     echo "No CVMFS detected, please install it."
