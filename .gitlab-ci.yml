@@ -159,6 +159,7 @@ fmt:cc7-llvm-lint:
 .testmod:
     extends: .test
     script:
+        - yum install -y valgrind
         - cd build/
         - ctest -R test_modules --output-on-failure -j4
 
@@ -181,6 +182,7 @@ examples:
         - source .gitlab/ci/init_x86_64.sh
         - source .gitlab/ci/load_deps.sh
     script:
+        - yum install -y valgrind
         - cd build/
         - ctest -R examples --output-on-failure -j4
 
