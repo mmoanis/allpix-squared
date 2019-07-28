@@ -165,6 +165,7 @@ fmt:cc7-llvm-lint:
 .testcore:
     extends: .test
     script:
+        - yum install -y valgrind
         - cd build/
         - ctest -R test_core --output-on-failure -j4
 
@@ -199,6 +200,7 @@ core:slc6-gcc:
         - cmp:slc6-gcc
     image: clicdp/slc6-base
     before_script:
+        - yum install -y valgrind
         - source .gitlab/ci/init_x86_64.sh
 
 #mod:lxplus-gcc:
