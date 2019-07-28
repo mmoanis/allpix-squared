@@ -49,11 +49,13 @@ IF(CLANG_FORMAT)
             COMMAND
             ${CLANG_FORMAT}
             -style=file
-            -output-replacements-xml
+            -i
+            #-output-replacements-xml
             ${CHECK_CXX_SOURCE_FILES}
+            && git diff
             # print output
-            | tee ${CMAKE_BINARY_DIR}/check_format_file.txt | grep -c "replacement " |
-            tr -d "[:cntrl:]" && echo " replacements necessary" && cat ${CMAKE_BINARY_DIR}/check_format_file.txt
+            # | tee ${CMAKE_BINARY_DIR}/check_format_file.txt | grep -c "replacement " |
+            # tr -d "[:cntrl:]" && echo " replacements necessary" && cat ${CMAKE_BINARY_DIR}/check_format_file.txt
             # WARNING: fix to stop with error if there are problems
             COMMAND ! grep -c "replacement "
             ${CMAKE_BINARY_DIR}/check_format_file.txt > /dev/null
