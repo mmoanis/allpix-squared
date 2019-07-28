@@ -234,12 +234,17 @@ void DetectorHistogrammerModule::init(std::mt19937_64&) {
 
 void DetectorHistogrammerModule::run(Event* event) {
     using namespace ROOT::Math;
-    auto pixels_message = event->fetchMessage<PixelHitMessage>();
+    std::shared_ptr<PixelHitMessage> pixels_message;
     auto mcparticle_message = event->fetchMessage<MCParticleMessage>();
 
-    auto random_generator = event->getRandomEngine();
-
     // Check that we actually received pixel hits - we might have none and just received MCParticles!
+    try {
+        pixels_message = event->fetchMessage<PixelHitMessage>();
+    } catch(const MessageNotFoundException&) {
+        pixels_message = nullptr;
+    }
+
+    auto random_generator = event->getRandomEngine();
     if(pixels_message != nullptr) {
         LOG(DEBUG) << "Received " << pixels_message->getData().size() << " pixel hits";
 
@@ -250,7 +255,8 @@ void DetectorHistogrammerModule::run(Event* event) {
 
             // Add pixel
             hit_map->Fill(pixel_idx.x(), pixel_idx.y());
-            charge_map->Fill(pixel_idx.x(), pixel_idx.y(), static_cast<double>(Units::convert(pixel_charge.getSignal(), "ke")));
+            charge_map->Fill(
+                pixel_idx.x(), pixel_idx.y(), static_cast<double>(Units::convert(pixel_charge.getSignal(), "ke")));
 
             // Update statistics
             total_vector_ += pixel_idx;
