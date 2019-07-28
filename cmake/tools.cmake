@@ -123,7 +123,7 @@ FUNCTION(ADD_ALLPIX_TEST TEST)
 
     ADD_TEST(NAME ${TEST}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/run_directory.sh "output/${TEST}" "valgrind --tool=memcheck --track-origins=yes --keep-stacktraces=alloc-and-free --leak-check=full ${CMAKE_INSTALL_PREFIX}/bin/allpix -c ${CMAKE_CURRENT_SOURCE_DIR}/${TEST} ${CLIOPTIONS}"
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/run_directory.sh "output/${TEST}" "valgrind --tool=memcheck --track-origins=yes --leak-check=full ${CMAKE_INSTALL_PREFIX}/bin/allpix -c ${CMAKE_CURRENT_SOURCE_DIR}/${TEST} ${CLIOPTIONS}"
     )
 
     # Parse configuration file for pass/fail conditions:
